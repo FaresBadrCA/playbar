@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<script src="https://unpkg.com/moment@2.29.4/moment.js"></script>
+    <script src="https://unpkg.com/jquery@3.3.1/dist/jquery.min.js"></script>
+    <script src="https://unpkg.com/bootstrap@4.1.0/dist/js/bootstrap.bundle.min.js"></script>
+	
+    <link href="https://unpkg.com/@fortawesome/fontawesome-free@6.1.2/css/all.css" rel="stylesheet" type="text/css" media="screen" />
+    <link href="https://unpkg.com/bootstrap@4.1.1/dist/css/bootstrap.min.css" rel="stylesheet" type="text/css" media="screen" />
+    <link href="./playbar.css" rel="stylesheet" type="text/css" media="screen" />
+
+<script>
+var playbarStartMoment = moment(new Date("2023-03-09 20:00:00"));
+var playbarCurrentMoment = moment(new Date("2023-03-09 20:00:00")); // time variable
+var playbarEndMoment = moment(new Date("2023-03-09 22:00:00"));
+var playbarLastUpdateTime = moment(); 
+var playbackSpeed = 100; // number of times faster than real-time
+
+function initPlaybar(){
+	var $progressText = $('#player-time-text');
+	var $progressInnerBar =  $('#player-inner-bar');
+	var $progressOuterBar = $('#player-outer-bar');
+	var $progressSpeedText = $('#player-speed-text');
+	var totalPlaybarSeconds = playbarEndMoment.diff(playbarStartMoment, 's');
+	
+	const updateProgress = function(progressPercent){
+		progressPercent = Math.max(0, Math.min(progressPercent, 1));
+		
+		// Update Text
+		playbarCurrentMoment = moment(playbarStartMoment).add(progressPercent * totalPlaybarSeconds * 1000, 'ms'); 
+		$progressText.html(
+			playbarCurrentMoment.format("MMM-DD HH:mm:ss") + " / " + playbarEndMoment.format("MMM-DD HH:mm:ss")
+		);
+		
+		// Update inner bar width
+		var playbarBoundingRect = $progressOuterBar[0].getBoundingClientRect();
+		$progressInnerBar.css({'width' : (progressPercent * 100) + '%'});
+	}
+	
+	updateProgress(0);
+	
+	$progressOuterBar.mousedown(
+		function(){
+			var playbarBoundingRect = $(this)[0].getBoundingClientRect();
+			const playerDraggedEvent = function(e){
+				e.preventDefault();
+				var progressPercent = (e.clientX - playbarBoundingRect.left) / playbarBoundingRect.width;
+				updateProgress(progressPercent);
+			}
+			
+			$(document).mousemove(playerDraggedEvent);
+			
+			var isDragging = true;
+			$(document).mouseup(function(e){
+				if (isDragging){
+					var progressPercent = (e.clientX - playbarBoundingRect.left) / playbarBoundingRect.width;
+					updateProgress(progressPercent)
+					$(document).off('mousemove', playerDraggedEvent);
+				}
+				isDragging = false;
+			});
+		}
+	)
+	
+	var playIncrementIntervalId;
+	$('#player-play-button').click(
+		function(){
+			if ($(this).children('i').hasClass('fa-play')){
+				$(this).children('i').addClass('fa-pause').removeClass('fa-play');
+				playbarLastUpdateTime = moment();
+				playIncrementIntervalId = setInterval(playIncrement, 100);
+			}
+			else{
+				$(this).children('i').addClass('fa-play').removeClass('fa-pause');
+				clearInterval(playIncrementIntervalId);
+			}
+		}
+	)
+	
+	const playIncrement = function (){
+		var millisecondsPassed = moment().diff(playbarLastUpdateTime, 'ms');
+		playbarLastUpdateTime = moment();
+		millisecondsPassed = millisecondsPassed * playbackSpeed;
+		playbarCurrentMoment.add(millisecondsPassed, 'ms');
+
+		if (playbarCurrentMoment.isAfter(playbarEndMoment) ) {
+			playbarCurrentMoment = playbarEndMoment.clone();
+			$('#player-play-button i').addClass('fa-play').removeClass('fa-pause');
+			clearInterval(playIncrementIntervalId);
+		}
+		var progressPercent = (playbarCurrentMoment.diff(playbarStartMoment, 'ms')) / (1000 * totalPlaybarSeconds);
+		updateProgress(progressPercent);
+	}
+	
+	$('#player-speed-range').on('input',
+		function(){
+			playbackSpeed = Math.round( Math.pow(2, $(this).val()) );
+			$progressSpeedText.text(playbackSpeed + '×' );
+		}
+	)
+	$('#player-speed-range').val(Math.log2(playbackSpeed));
+	$('#player-speed-text').text(playbackSpeed + '×');
+}
+
+
+$(initPlaybar);
+</script>
+</head>
+
+<body>
+	<div id="player-container">
+	  <div id="player-play-button" class="d-flex align-items-center justify-content-center">
+		<i class="fa fa-play"></i>
+	  </div>
+	  
+	  <span id="player-time-text" class="justify-content-center d-flex position-absolute w-100"></span>
+
+	  <div id="player-outer-bar">
+		<div id="player-inner-bar">
+		<i id="player-progress-thumb" class="fa fa-circle"></i>
+	  </div>
+	  </div>
+	  
+	  <div id="player-speed-control" class="d-flex align-items-center"> 
+		<label>
+			<span id="player-speed-text">
+				test
+			</span>
+		<input type="range" id="player-speed-range" min=0 max=10 step=0.1>
+		</label>
+	  </div>
+	</div>
+</body>
+</html>
